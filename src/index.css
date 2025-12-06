@@ -6,106 +6,106 @@
 
 @layer base {
   :root {
-    /* EnviroGeo Light Theme */
-    --background: 210 40% 98%;
-    --foreground: 222 47% 11%;
+    /* EnviroSense Light Theme - Fresh Green */
+    --background: 140 20% 98%;
+    --foreground: 150 40% 10%;
     
     --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
+    --card-foreground: 150 40% 10%;
     
     --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 11%;
+    --popover-foreground: 150 40% 10%;
     
-    --primary: 166 84% 37%;
+    --primary: 152 76% 36%;
     --primary-foreground: 0 0% 100%;
     
-    --secondary: 210 40% 96%;
-    --secondary-foreground: 222 47% 11%;
+    --secondary: 140 30% 94%;
+    --secondary-foreground: 150 40% 10%;
     
-    --muted: 210 40% 96%;
-    --muted-foreground: 215 16% 47%;
+    --muted: 140 20% 94%;
+    --muted-foreground: 150 15% 45%;
     
-    --accent: 199 89% 48%;
+    --accent: 166 84% 40%;
     --accent-foreground: 0 0% 100%;
     
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
     
-    --border: 214 32% 91%;
-    --input: 214 32% 91%;
-    --ring: 166 84% 37%;
+    --border: 150 20% 88%;
+    --input: 150 20% 88%;
+    --ring: 152 76% 36%;
     
     --radius: 0.75rem;
     
-    /* Custom EnviroGeo tokens */
-    --enviro-ocean: 199 89% 48%;
-    --enviro-forest: 152 76% 36%;
-    --enviro-earth: 28 73% 59%;
-    --enviro-sky: 199 95% 74%;
-    --enviro-sunset: 24 95% 64%;
+    /* Custom EnviroSense tokens */
+    --enviro-leaf: 142 76% 36%;
+    --enviro-forest: 152 76% 28%;
+    --enviro-mint: 158 64% 52%;
+    --enviro-sky: 199 89% 55%;
+    --enviro-earth: 28 60% 50%;
     
-    --gradient-hero: linear-gradient(135deg, hsl(222 47% 11%) 0%, hsl(210 40% 20%) 50%, hsl(199 89% 20%) 100%);
-    --gradient-card: linear-gradient(180deg, hsl(0 0% 100% / 0.9) 0%, hsl(210 40% 98% / 0.8) 100%);
-    --gradient-accent: linear-gradient(135deg, hsl(166 84% 37%) 0%, hsl(199 89% 48%) 100%);
+    --gradient-hero: linear-gradient(135deg, hsl(150 40% 8%) 0%, hsl(152 50% 15%) 50%, hsl(166 60% 18%) 100%);
+    --gradient-card: linear-gradient(180deg, hsl(0 0% 100% / 0.95) 0%, hsl(140 30% 98% / 0.9) 100%);
+    --gradient-accent: linear-gradient(135deg, hsl(152 76% 36%) 0%, hsl(166 84% 40%) 100%);
     
     --sidebar-background: 0 0% 100%;
-    --sidebar-foreground: 222 47% 11%;
-    --sidebar-primary: 166 84% 37%;
+    --sidebar-foreground: 150 40% 10%;
+    --sidebar-primary: 152 76% 36%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 210 40% 96%;
-    --sidebar-accent-foreground: 222 47% 11%;
-    --sidebar-border: 214 32% 91%;
-    --sidebar-ring: 166 84% 37%;
+    --sidebar-accent: 140 30% 94%;
+    --sidebar-accent-foreground: 150 40% 10%;
+    --sidebar-border: 150 20% 88%;
+    --sidebar-ring: 152 76% 36%;
   }
 
   .dark {
-    /* EnviroGeo Dark Theme - Satellite/Geo aesthetic */
-    --background: 222 47% 6%;
-    --foreground: 210 40% 98%;
+    /* EnviroSense Dark Theme - Deep Forest */
+    --background: 150 30% 6%;
+    --foreground: 140 20% 98%;
     
-    --card: 222 47% 9%;
-    --card-foreground: 210 40% 98%;
+    --card: 150 30% 9%;
+    --card-foreground: 140 20% 98%;
     
-    --popover: 222 47% 9%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 150 30% 9%;
+    --popover-foreground: 140 20% 98%;
     
-    --primary: 166 84% 45%;
-    --primary-foreground: 222 47% 6%;
+    --primary: 152 76% 45%;
+    --primary-foreground: 150 30% 6%;
     
-    --secondary: 217 33% 17%;
-    --secondary-foreground: 210 40% 98%;
+    --secondary: 150 25% 15%;
+    --secondary-foreground: 140 20% 98%;
     
-    --muted: 217 33% 17%;
-    --muted-foreground: 215 20% 65%;
+    --muted: 150 25% 15%;
+    --muted-foreground: 150 15% 60%;
     
-    --accent: 199 89% 55%;
-    --accent-foreground: 222 47% 6%;
+    --accent: 166 84% 50%;
+    --accent-foreground: 150 30% 6%;
     
-    --destructive: 0 63% 31%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 63% 40%;
+    --destructive-foreground: 140 20% 98%;
     
-    --border: 217 33% 20%;
-    --input: 217 33% 20%;
-    --ring: 166 84% 45%;
+    --border: 150 20% 18%;
+    --input: 150 20% 18%;
+    --ring: 152 76% 45%;
     
-    --enviro-ocean: 199 89% 55%;
-    --enviro-forest: 152 76% 45%;
-    --enviro-earth: 28 73% 50%;
-    --enviro-sky: 199 95% 65%;
-    --enviro-sunset: 24 95% 55%;
+    --enviro-leaf: 142 76% 45%;
+    --enviro-forest: 152 76% 40%;
+    --enviro-mint: 158 64% 55%;
+    --enviro-sky: 199 89% 60%;
+    --enviro-earth: 28 60% 55%;
     
-    --gradient-hero: linear-gradient(135deg, hsl(222 47% 4%) 0%, hsl(210 40% 8%) 50%, hsl(199 60% 12%) 100%);
-    --gradient-card: linear-gradient(180deg, hsl(222 47% 12% / 0.9) 0%, hsl(222 47% 9% / 0.8) 100%);
-    --gradient-accent: linear-gradient(135deg, hsl(166 84% 40%) 0%, hsl(199 89% 50%) 100%);
+    --gradient-hero: linear-gradient(135deg, hsl(150 30% 4%) 0%, hsl(152 40% 8%) 50%, hsl(166 50% 10%) 100%);
+    --gradient-card: linear-gradient(180deg, hsl(150 30% 12% / 0.95) 0%, hsl(150 30% 9% / 0.9) 100%);
+    --gradient-accent: linear-gradient(135deg, hsl(152 76% 40%) 0%, hsl(166 84% 45%) 100%);
     
-    --sidebar-background: 222 47% 8%;
-    --sidebar-foreground: 210 40% 98%;
-    --sidebar-primary: 166 84% 45%;
-    --sidebar-primary-foreground: 222 47% 6%;
-    --sidebar-accent: 217 33% 15%;
-    --sidebar-accent-foreground: 210 40% 98%;
-    --sidebar-border: 217 33% 20%;
-    --sidebar-ring: 166 84% 45%;
+    --sidebar-background: 150 30% 8%;
+    --sidebar-foreground: 140 20% 98%;
+    --sidebar-primary: 152 76% 45%;
+    --sidebar-primary-foreground: 150 30% 6%;
+    --sidebar-accent: 150 25% 13%;
+    --sidebar-accent-foreground: 140 20% 98%;
+    --sidebar-border: 150 20% 18%;
+    --sidebar-ring: 152 76% 45%;
   }
 }
 
@@ -223,21 +223,34 @@
   }
 }
 
-/* Mapbox overrides */
-.mapboxgl-map {
+/* Leaflet overrides */
+.leaflet-container {
   font-family: inherit;
+  @apply bg-card;
 }
 
-.mapboxgl-ctrl-group {
-  @apply !bg-card/90 !backdrop-blur-xl !border-border/50 !rounded-lg !shadow-lg;
+.leaflet-control-zoom {
+  @apply !border-border/50 !rounded-lg overflow-hidden;
 }
 
-.mapboxgl-ctrl-group button {
-  @apply !border-border/30;
+.leaflet-control-zoom a {
+  @apply !bg-card/90 !text-foreground !border-border/30 hover:!bg-muted;
 }
 
-.mapboxgl-ctrl-attrib {
-  @apply !bg-background/80 !backdrop-blur-sm;
+.leaflet-bar {
+  @apply !border-border/50 !rounded-lg overflow-hidden shadow-lg;
+}
+
+.leaflet-draw-toolbar a {
+  @apply !bg-card/90 !border-border/30;
+}
+
+.leaflet-popup-content-wrapper {
+  @apply !bg-card !text-foreground !rounded-lg !shadow-xl;
+}
+
+.leaflet-popup-tip {
+  @apply !bg-card;
 }
 
 /* Custom scrollbar */
