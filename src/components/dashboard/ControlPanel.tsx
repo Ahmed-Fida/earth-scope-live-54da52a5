@@ -7,6 +7,7 @@ import {
   Calendar,
   MapPin,
   Loader2,
+  Save,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -32,6 +33,7 @@ import {
 import { DrawnShape } from './LeafletMap';
 import { AnalysisResults } from './AnalysisResults';
 import { useToast } from '@/hooks/use-toast';
+import { useAnalysisHistory } from '@/hooks/useAnalysisHistory';
 
 const parameterList = Object.entries(PARAMETERS).map(([id, config]) => ({
   id: id as ParameterType,
@@ -48,10 +50,12 @@ interface ControlPanelProps {
 
 export function ControlPanel({ isOpen, onToggle, drawnShape }: ControlPanelProps) {
   const { toast } = useToast();
+  const { addAnalysis } = useAnalysisHistory();
   const [selectedParameter, setSelectedParameter] = useState<ParameterType>('NDVI');
   const [startDate, setStartDate] = useState<Date>(subDays(new Date(), 90));
   const [endDate, setEndDate] = useState<Date>(new Date());
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<any>(null);
   
   // Coordinate input mode
@@ -65,11 +69,17 @@ export function ControlPanel({ isOpen, onToggle, drawnShape }: ControlPanelProps
 
   const handleAnalyze = async () => {
     let hasValidArea = false;
+    let geometry: unknown = null;
+    let geometryType = '';
     
     if (inputMode === 'draw' && drawnShape) {
       hasValidArea = true;
+      geometry = drawnShape.geoJSON?.geometry;
+      geometryType = drawnShape.type;
     } else if (inputMode === 'coordinates' && coordLat && coordLng) {
       hasValidArea = true;
+      geometry = { type: 'Point', coordinates: [parseFloat(coordLng), parseFloat(coordLat)] };
+      geometryType = 'point';
       (window as any).leafletMapMethods?.addMarker(parseFloat(coordLat), parseFloat(coordLng));
     } else if (inputMode === 'bbox' && bboxNorth && bboxSouth && bboxEast && bboxWest) {
       hasValidArea = true;
@@ -79,6 +89,17 @@ export function ControlPanel({ isOpen, onToggle, drawnShape }: ControlPanelProps
         { lat: parseFloat(bboxSouth), lng: parseFloat(bboxEast) },
         { lat: parseFloat(bboxSouth), lng: parseFloat(bboxWest) },
       ];
+      geometry = {
+        type: 'Polygon',
+        coordinates: [[
+          [parseFloat(bboxWest), parseFloat(bboxNorth)],
+          [parseFloat(bboxEast), parseFloat(bboxNorth)],
+          [parseFloat(bboxEast), parseFloat(bboxSouth)],
+          [parseFloat(bboxWest), parseFloat(bboxSouth)],
+          [parseFloat(bboxWest), parseFloat(bboxNorth)],
+        ]],
+      };
+      geometryType = 'rectangle';
       (window as any).leafletMapMethods?.addShapeFromCoords(coords, 'rectangle');
     }
 
@@ -101,7 +122,7 @@ export function ControlPanel({ isOpen, onToggle, drawnShape }: ControlPanelProps
     const insights = generateInsights(selectedParameter, stats);
     const paramConfig = PARAMETERS[selectedParameter];
 
-    setAnalysisResult({
+    const result = {
       parameter: {
         id: selectedParameter,
         name: paramConfig.name,
@@ -120,13 +141,35 @@ export function ControlPanel({ isOpen, onToggle, drawnShape }: ControlPanelProps
       insights,
       startDate: format(startDate, 'MMM d, yyyy'),
       endDate: format(endDate, 'MMM d, yyyy'),
-    });
+      geometry,
+      geometryType,
+    };
 
+    setAnalysisResult(result);
     setIsAnalyzing(false);
     toast({
       title: 'Analysis complete',
       description: `${paramConfig.name} data retrieved successfully.`,
     });
+  };
+
+  const handleSaveAnalysis = async () => {
+    if (!analysisResult) return;
+    
+    setIsSaving(true);
+    await addAnalysis({
+      parameter: analysisResult.parameter.id,
+      geometry: analysisResult.geometry,
+      geometryType: analysisResult.geometryType,
+      startDate: format(startDate, 'yyyy-MM-dd'),
+      endDate: format(endDate, 'yyyy-MM-dd'),
+      results: {
+        timeSeries: analysisResult.timeSeries,
+        stats: analysisResult.stats,
+        insights: analysisResult.insights,
+      },
+    });
+    setIsSaving(false);
   };
 
   const handleExport = (formatId: string) => {
@@ -302,7 +345,23 @@ export function ControlPanel({ isOpen, onToggle, drawnShape }: ControlPanelProps
               </Button>
 
               {/* Results */}
-              {analysisResult && <AnalysisResults result={analysisResult} onExport={handleExport} />}
+              {analysisResult && (
+                <>
+                  <AnalysisResults result={analysisResult} onExport={handleExport} />
+                  <Button 
+                    onClick={handleSaveAnalysis} 
+                    disabled={isSaving}
+                    variant="outline" 
+                    className="w-full"
+                  >
+                    {isSaving ? (
+                      <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Saving...</>
+                    ) : (
+                      <><Save className="w-4 h-4 mr-2" />Save to History</>
+                    )}
+                  </Button>
+                </>
+              )}
             </div>
           </motion.div>
         )}

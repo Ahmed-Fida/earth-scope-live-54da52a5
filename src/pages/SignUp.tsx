@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/useAuth';
 
 export default function SignUp() {
   const [name, setName] = useState('');
@@ -15,28 +16,41 @@ export default function SignUp() {
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { signUp, signInWithGoogle } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     
-    // Mock signup - replace with actual auth
-    setTimeout(() => {
-      localStorage.setItem('envirosense_user', JSON.stringify({ name, email }));
+    const { error } = await signUp(email, password, name);
+    
+    if (error) {
       toast({
-        title: 'Account created!',
-        description: 'Welcome to EnviroSense. Redirecting to dashboard...',
+        title: 'Sign up failed',
+        description: error.message,
+        variant: 'destructive',
       });
       setIsLoading(false);
-      navigate('/dashboard');
-    }, 1500);
+      return;
+    }
+
+    toast({
+      title: 'Account created!',
+      description: 'Welcome to EnviroSense. Redirecting to dashboard...',
+    });
+    setIsLoading(false);
+    navigate('/dashboard');
   };
 
-  const handleGoogleSignUp = () => {
-    toast({
-      title: 'Google Sign Up',
-      description: 'Google authentication will be available soon.',
-    });
+  const handleGoogleSignUp = async () => {
+    const { error } = await signInWithGoogle();
+    if (error) {
+      toast({
+        title: 'Google sign up failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    }
   };
 
   return (

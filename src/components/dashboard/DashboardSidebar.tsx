@@ -18,6 +18,7 @@ import {
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/useAuth';
 
 const menuItems = [
   { icon: LayoutDashboard, label: 'Dashboard', href: '/dashboard' },
@@ -37,6 +38,7 @@ export function DashboardSidebar({ isCollapsed, onToggle }: DashboardSidebarProp
   const location = useLocation();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { signOut } = useAuth();
   const [isDark, setIsDark] = useState(document.documentElement.classList.contains('dark'));
 
   const toggleTheme = () => {
@@ -44,8 +46,16 @@ export function DashboardSidebar({ isCollapsed, onToggle }: DashboardSidebarProp
     setIsDark(!isDark);
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('envirosense_user');
+  const handleLogout = async () => {
+    const { error } = await signOut();
+    if (error) {
+      toast({
+        title: 'Logout failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+      return;
+    }
     toast({
       title: 'Logged out',
       description: 'You have been logged out successfully.',

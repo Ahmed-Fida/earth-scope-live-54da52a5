@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/useAuth';
 
 export default function SignIn() {
   const [email, setEmail] = useState('');
@@ -14,28 +15,41 @@ export default function SignIn() {
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { signIn, signInWithGoogle } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     
-    // Mock login - replace with actual auth
-    setTimeout(() => {
-      localStorage.setItem('envirosense_user', JSON.stringify({ email }));
+    const { error } = await signIn(email, password);
+    
+    if (error) {
       toast({
-        title: 'Welcome back!',
-        description: 'Redirecting to dashboard...',
+        title: 'Sign in failed',
+        description: error.message,
+        variant: 'destructive',
       });
       setIsLoading(false);
-      navigate('/dashboard');
-    }, 1500);
+      return;
+    }
+
+    toast({
+      title: 'Welcome back!',
+      description: 'Redirecting to dashboard...',
+    });
+    setIsLoading(false);
+    navigate('/dashboard');
   };
 
-  const handleGoogleSignIn = () => {
-    toast({
-      title: 'Google Sign In',
-      description: 'Google authentication will be available soon.',
-    });
+  const handleGoogleSignIn = async () => {
+    const { error } = await signInWithGoogle();
+    if (error) {
+      toast({
+        title: 'Google sign in failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    }
   };
 
   return (
