@@ -1,17 +1,13 @@
-import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { MongoClient, ObjectId } from "https://deno.land/x/mongo@v0.32.0/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const MONGODB_DATA_API_KEY = Deno.env.get('MONGODB_DATA_API_KEY');
-const MONGODB_APP_ID = Deno.env.get('MONGODB_APP_ID');
+const MONGODB_URI = Deno.env.get('MONGODB_URI');
 const DATABASE_NAME = 'envirosense';
-
-// MongoDB Atlas Data API endpoint
-const getDataApiUrl = () => `https://data.mongodb-api.com/app/${MONGODB_APP_ID}/endpoint/data/v1`;
 
 interface MongoDBRequest {
   action: string;
@@ -21,38 +17,16 @@ interface MongoDBRequest {
   userId?: string;
 }
 
-async function callMongoDBDataAPI(
-  action: string,
-  collection: string,
-  body: Record<string, unknown>
-): Promise<unknown> {
-  const url = `${getDataApiUrl()}/action/${action}`;
-  
-  console.log(`MongoDB Data API call: ${action} on ${collection}`);
-  
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'api-key': MONGODB_DATA_API_KEY!,
-    },
-    body: JSON.stringify({
-      dataSource: 'Cluster0', // Default cluster name, adjust if different
-      database: DATABASE_NAME,
-      collection,
-      ...body,
-    }),
-  });
+let client: MongoClient | null = null;
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error(`MongoDB Data API error: ${response.status} - ${errorText}`);
-    throw new Error(`MongoDB API error: ${response.status} - ${errorText}`);
+async function getMongoClient(): Promise<MongoClient> {
+  if (!client) {
+    client = new MongoClient();
+    console.log('Connecting to MongoDB...');
+    await client.connect(MONGODB_URI!);
+    console.log('Connected to MongoDB successfully');
   }
-
-  const result = await response.json();
-  console.log(`MongoDB Data API response:`, JSON.stringify(result).substring(0, 200));
-  return result;
+  return client;
 }
 
 serve(async (req) => {
@@ -61,10 +35,10 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  if (!MONGODB_DATA_API_KEY || !MONGODB_APP_ID) {
-    console.error('MongoDB Data API credentials not configured');
+  if (!MONGODB_URI) {
+    console.error('MONGODB_URI not configured');
     return new Response(
-      JSON.stringify({ error: 'MongoDB Data API not configured. Please set MONGODB_DATA_API_KEY and MONGODB_APP_ID secrets.' }),
+      JSON.stringify({ error: 'MongoDB not configured. Please set MONGODB_URI secret.' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
@@ -74,7 +48,11 @@ serve(async (req) => {
     
     console.log(`Processing action: ${action} for collection: ${collection}`);
     
-    const result = await handleAction(action, collection, data, filter, userId);
+    const mongoClient = await getMongoClient();
+    const db = mongoClient.database(DATABASE_NAME);
+    const coll = db.collection(collection);
+    
+    const result = await handleAction(action, coll, data, filter, userId);
 
     return new Response(
       JSON.stringify({ success: true, data: result }),
@@ -93,7 +71,7 @@ serve(async (req) => {
 
 async function handleAction(
   action: string, 
-  collection: string, 
+  collection: ReturnType<ReturnType<MongoClient['database']>['collection']>,
   data?: Record<string, unknown>, 
   filter?: Record<string, unknown>,
   userId?: string
@@ -108,50 +86,50 @@ async function handleAction(
         createdAt: now,
         updatedAt: now,
       };
-      const result = await callMongoDBDataAPI('insertOne', collection, { document });
-      return result;
+      const insertId = await collection.insertOne(document);
+      console.log('Inserted document with id:', insertId);
+      return { insertedId: insertId };
     }
 
     case 'findOne': {
-      const result = await callMongoDBDataAPI('findOne', collection, { filter: filter || {} });
-      return (result as { document: unknown }).document;
+      const doc = await collection.findOne(filter || {});
+      return doc;
     }
 
     case 'find': {
-      const result = await callMongoDBDataAPI('find', collection, { filter: filter || {} });
-      return (result as { documents: unknown[] }).documents;
+      const docs = await collection.find(filter || {}).toArray();
+      return docs;
     }
 
     case 'updateOne': {
-      const result = await callMongoDBDataAPI('updateOne', collection, {
-        filter: filter || {},
-        update: { $set: { ...data, updatedAt: now } },
-      });
-      return result;
+      const result = await collection.updateOne(
+        filter || {},
+        { $set: { ...data, updatedAt: now } }
+      );
+      return { matchedCount: result.matchedCount, modifiedCount: result.modifiedCount };
     }
 
     case 'deleteOne': {
-      const result = await callMongoDBDataAPI('deleteOne', collection, { filter: filter || {} });
-      return result;
+      const result = await collection.deleteOne(filter || {});
+      return { deletedCount: result };
     }
 
     case 'upsertProfile': {
-      const result = await callMongoDBDataAPI('updateOne', collection, {
-        filter: { userId },
-        update: {
+      const result = await collection.updateOne(
+        { userId },
+        {
           $set: { ...data, userId, updatedAt: now },
           $setOnInsert: { createdAt: now },
         },
-        upsert: true,
-      });
-      return result;
+        { upsert: true }
+      );
+      console.log('Upserted profile:', result);
+      return { matchedCount: result.matchedCount, modifiedCount: result.modifiedCount, upsertedId: result.upsertedId };
     }
 
     case 'getProfile': {
-      const result = await callMongoDBDataAPI('findOne', collection, {
-        filter: { userId },
-      });
-      return (result as { document: unknown }).document;
+      const doc = await collection.findOne({ userId });
+      return doc;
     }
 
     case 'saveAnalysis': {
@@ -160,23 +138,21 @@ async function handleAction(
         ...data,
         createdAt: now,
       };
-      const result = await callMongoDBDataAPI('insertOne', collection, { document });
-      return result;
+      const insertId = await collection.insertOne(document);
+      return { insertedId: insertId };
     }
 
     case 'getAnalysisHistory': {
-      const result = await callMongoDBDataAPI('find', collection, {
-        filter: { userId },
-        sort: { createdAt: -1 },
-      });
-      return (result as { documents: unknown[] }).documents;
+      const docs = await collection.find({ userId }).sort({ createdAt: -1 }).toArray();
+      return docs;
     }
 
     case 'deleteAnalysis': {
-      const result = await callMongoDBDataAPI('deleteOne', collection, {
-        filter: { _id: { $oid: filter?._id as string }, userId },
+      const result = await collection.deleteOne({
+        _id: new ObjectId(filter?._id as string),
+        userId,
       });
-      return result;
+      return { deletedCount: result };
     }
 
     default:
