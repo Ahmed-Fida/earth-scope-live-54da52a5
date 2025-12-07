@@ -6,20 +6,53 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const MONGODB_URI = Deno.env.get('MONGODB_URI');
+const MONGODB_DATA_API_KEY = Deno.env.get('MONGODB_DATA_API_KEY');
+const MONGODB_APP_ID = Deno.env.get('MONGODB_APP_ID');
+const DATABASE_NAME = 'envirosense';
 
-// Parse MongoDB connection string to extract cluster info
-function parseMongoURI(uri: string) {
-  try {
-    // Extract cluster from connection string like: mongodb+srv://user:pass@cluster.xxxxx.mongodb.net/
-    const match = uri.match(/@([^/]+)/);
-    if (match) {
-      return match[1];
-    }
-  } catch (e) {
-    console.error('Failed to parse MongoDB URI:', e);
+// MongoDB Atlas Data API endpoint
+const getDataApiUrl = () => `https://data.mongodb-api.com/app/${MONGODB_APP_ID}/endpoint/data/v1`;
+
+interface MongoDBRequest {
+  action: string;
+  collection: string;
+  data?: Record<string, unknown>;
+  filter?: Record<string, unknown>;
+  userId?: string;
+}
+
+async function callMongoDBDataAPI(
+  action: string,
+  collection: string,
+  body: Record<string, unknown>
+): Promise<unknown> {
+  const url = `${getDataApiUrl()}/action/${action}`;
+  
+  console.log(`MongoDB Data API call: ${action} on ${collection}`);
+  
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'api-key': MONGODB_DATA_API_KEY!,
+    },
+    body: JSON.stringify({
+      dataSource: 'Cluster0', // Default cluster name, adjust if different
+      database: DATABASE_NAME,
+      collection,
+      ...body,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error(`MongoDB Data API error: ${response.status} - ${errorText}`);
+    throw new Error(`MongoDB API error: ${response.status} - ${errorText}`);
   }
-  return null;
+
+  const result = await response.json();
+  console.log(`MongoDB Data API response:`, JSON.stringify(result).substring(0, 200));
+  return result;
 }
 
 serve(async (req) => {
@@ -28,18 +61,18 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  if (!MONGODB_URI) {
+  if (!MONGODB_DATA_API_KEY || !MONGODB_APP_ID) {
+    console.error('MongoDB Data API credentials not configured');
     return new Response(
-      JSON.stringify({ error: 'MongoDB URI not configured' }),
+      JSON.stringify({ error: 'MongoDB Data API not configured. Please set MONGODB_DATA_API_KEY and MONGODB_APP_ID secrets.' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 
   try {
-    const { action, collection, data, filter, userId } = await req.json();
+    const { action, collection, data, filter, userId }: MongoDBRequest = await req.json();
     
-    // For now, use in-memory storage simulation since MongoDB Data API requires additional setup
-    // This provides the same interface while you configure MongoDB Atlas Data API
+    console.log(`Processing action: ${action} for collection: ${collection}`);
     
     const result = await handleAction(action, collection, data, filter, userId);
 
@@ -58,13 +91,6 @@ serve(async (req) => {
   }
 });
 
-// In-memory storage (for development - data persists only during function execution)
-// In production, this should be replaced with actual MongoDB Data API calls
-const memoryStore: Record<string, Record<string, unknown>[]> = {
-  profiles: [],
-  analysis_history: [],
-};
-
 async function handleAction(
   action: string, 
   collection: string, 
@@ -73,109 +99,87 @@ async function handleAction(
   userId?: string
 ): Promise<unknown> {
   
-  if (!memoryStore[collection]) {
-    memoryStore[collection] = [];
-  }
-  
-  const coll = memoryStore[collection];
   const now = new Date().toISOString();
 
   switch (action) {
     case 'insertOne': {
-      const doc = {
-        _id: crypto.randomUUID(),
+      const document = {
         ...data,
         createdAt: now,
         updatedAt: now,
       };
-      coll.push(doc);
-      return { insertedId: doc._id };
+      const result = await callMongoDBDataAPI('insertOne', collection, { document });
+      return result;
     }
 
     case 'findOne': {
-      return coll.find(doc => matchesFilter(doc, filter)) || null;
+      const result = await callMongoDBDataAPI('findOne', collection, { filter: filter || {} });
+      return (result as { document: unknown }).document;
     }
 
     case 'find': {
-      return coll.filter(doc => matchesFilter(doc, filter));
+      const result = await callMongoDBDataAPI('find', collection, { filter: filter || {} });
+      return (result as { documents: unknown[] }).documents;
     }
 
     case 'updateOne': {
-      const index = coll.findIndex(doc => matchesFilter(doc, filter));
-      if (index >= 0) {
-        coll[index] = { ...coll[index], ...data, updatedAt: now };
-        return { modifiedCount: 1 };
-      }
-      return { modifiedCount: 0 };
+      const result = await callMongoDBDataAPI('updateOne', collection, {
+        filter: filter || {},
+        update: { $set: { ...data, updatedAt: now } },
+      });
+      return result;
     }
 
     case 'deleteOne': {
-      const index = coll.findIndex(doc => matchesFilter(doc, filter));
-      if (index >= 0) {
-        coll.splice(index, 1);
-        return { deletedCount: 1 };
-      }
-      return { deletedCount: 0 };
+      const result = await callMongoDBDataAPI('deleteOne', collection, { filter: filter || {} });
+      return result;
     }
 
     case 'upsertProfile': {
-      const existingIndex = coll.findIndex(doc => doc.userId === userId);
-      if (existingIndex >= 0) {
-        coll[existingIndex] = { ...coll[existingIndex], ...data, userId, updatedAt: now };
-        return { modifiedCount: 1, upsertedId: null };
-      } else {
-        const doc = {
-          _id: crypto.randomUUID(),
-          userId,
-          ...data,
-          createdAt: now,
-          updatedAt: now,
-        };
-        coll.push(doc);
-        return { modifiedCount: 0, upsertedId: doc._id };
-      }
+      const result = await callMongoDBDataAPI('updateOne', collection, {
+        filter: { userId },
+        update: {
+          $set: { ...data, userId, updatedAt: now },
+          $setOnInsert: { createdAt: now },
+        },
+        upsert: true,
+      });
+      return result;
     }
 
     case 'getProfile': {
-      return coll.find(doc => doc.userId === userId) || null;
+      const result = await callMongoDBDataAPI('findOne', collection, {
+        filter: { userId },
+      });
+      return (result as { document: unknown }).document;
     }
 
     case 'saveAnalysis': {
-      const doc = {
-        _id: crypto.randomUUID(),
+      const document = {
         userId,
         ...data,
         createdAt: now,
       };
-      coll.push(doc);
-      return { insertedId: doc._id };
+      const result = await callMongoDBDataAPI('insertOne', collection, { document });
+      return result;
     }
 
     case 'getAnalysisHistory': {
-      return coll
-        .filter(doc => doc.userId === userId)
-        .sort((a, b) => {
-          const dateA = new Date(a.createdAt as string).getTime();
-          const dateB = new Date(b.createdAt as string).getTime();
-          return dateB - dateA;
-        });
+      const result = await callMongoDBDataAPI('find', collection, {
+        filter: { userId },
+        sort: { createdAt: -1 },
+      });
+      return (result as { documents: unknown[] }).documents;
     }
 
     case 'deleteAnalysis': {
-      const index = coll.findIndex(doc => doc._id === filter?._id && doc.userId === userId);
-      if (index >= 0) {
-        coll.splice(index, 1);
-        return { deletedCount: 1 };
-      }
-      return { deletedCount: 0 };
+      const result = await callMongoDBDataAPI('deleteOne', collection, {
+        filter: { _id: { $oid: filter?._id as string }, userId },
+      });
+      return result;
     }
 
     default:
       throw new Error(`Unknown action: ${action}`);
   }
-}
-
-function matchesFilter(doc: Record<string, unknown>, filter?: Record<string, unknown>): boolean {
-  if (!filter) return true;
-  return Object.entries(filter).every(([key, value]) => doc[key] === value);
 }
