@@ -1,65 +1,48 @@
 import { supabase } from "@/integrations/supabase/client";
 
-const FUNCTION_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/mongodb`;
-
-interface MongoDBResponse<T = unknown> {
-  success: boolean;
-  data: T;
-  error?: string;
-}
-
-async function callMongoDB<T = unknown>(
-  action: string,
-  options: {
-    collection: string;
-    data?: Record<string, unknown>;
-    filter?: Record<string, unknown>;
-    userId?: string;
-  }
-): Promise<MongoDBResponse<T>> {
-  const { data: { session } } = await supabase.auth.getSession();
-  
-  const response = await fetch(FUNCTION_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${session?.access_token || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-    },
-    body: JSON.stringify({
-      action,
-      ...options,
-    }),
-  });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || 'MongoDB operation failed');
-  }
-
-  return response.json();
-}
-
-// Profile operations
-export async function upsertProfile(userId: string, profileData: {
+interface ProfileData {
   email?: string;
   fullName?: string;
   avatarUrl?: string;
-}) {
-  return callMongoDB('upsertProfile', {
-    collection: 'profiles',
-    userId,
-    data: profileData,
-  });
+}
+
+// Profile operations - now using Supabase
+export async function upsertProfile(userId: string, profileData: ProfileData) {
+  const { data, error } = await supabase
+    .from('profiles')
+    .upsert({
+      user_id: userId,
+      email: profileData.email,
+      full_name: profileData.fullName,
+      avatar_url: profileData.avatarUrl,
+    }, { onConflict: 'user_id' })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return { success: true, data };
 }
 
 export async function getProfile(userId: string) {
-  return callMongoDB('getProfile', {
-    collection: 'profiles',
-    userId,
-  });
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (error) throw error;
+  return {
+    success: true,
+    data: data ? {
+      userId: data.user_id,
+      email: data.email,
+      fullName: data.full_name,
+      avatarUrl: data.avatar_url,
+    } : null,
+  };
 }
 
-// Analysis history operations
+// Analysis history operations - now using Supabase
 export async function saveAnalysis(userId: string, analysisData: {
   parameter: string;
   geometry: unknown;
@@ -68,57 +51,53 @@ export async function saveAnalysis(userId: string, analysisData: {
   endDate: string;
   results: unknown;
 }) {
-  return callMongoDB('saveAnalysis', {
-    collection: 'analysis_history',
-    userId,
-    data: analysisData,
-  });
+  const { data, error } = await supabase
+    .from('analysis_history')
+    .insert({
+      user_id: userId,
+      parameter: analysisData.parameter,
+      geometry: analysisData.geometry as any,
+      geometry_type: analysisData.geometryType,
+      start_date: analysisData.startDate,
+      end_date: analysisData.endDate,
+      results: analysisData.results as any,
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return { success: true, data };
 }
 
 export async function getAnalysisHistory(userId: string) {
-  return callMongoDB<Array<{
-    _id: string;
-    parameter: string;
-    geometryType: string;
-    startDate: string;
-    endDate: string;
-    results: unknown;
-    createdAt: string;
-  }>>('getAnalysisHistory', {
-    collection: 'analysis_history',
-    userId,
-  });
+  const { data, error } = await supabase
+    .from('analysis_history')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+  return {
+    success: true,
+    data: (data || []).map(row => ({
+      _id: row.id,
+      parameter: row.parameter,
+      geometryType: row.geometry_type,
+      startDate: row.start_date,
+      endDate: row.end_date,
+      results: row.results,
+      createdAt: row.created_at,
+    })),
+  };
 }
 
 export async function deleteAnalysis(userId: string, analysisId: string) {
-  return callMongoDB('deleteAnalysis', {
-    collection: 'analysis_history',
-    userId,
-    filter: { _id: analysisId },
-  });
-}
+  const { error } = await supabase
+    .from('analysis_history')
+    .delete()
+    .eq('id', analysisId)
+    .eq('user_id', userId);
 
-// Generic operations
-export async function insertDocument(collection: string, data: Record<string, unknown>) {
-  return callMongoDB('insertOne', { collection, data });
-}
-
-export async function findDocument(collection: string, filter: Record<string, unknown>) {
-  return callMongoDB('findOne', { collection, filter });
-}
-
-export async function findDocuments(collection: string, filter: Record<string, unknown>) {
-  return callMongoDB('find', { collection, filter });
-}
-
-export async function updateDocument(
-  collection: string,
-  filter: Record<string, unknown>,
-  data: Record<string, unknown>
-) {
-  return callMongoDB('updateOne', { collection, filter, data });
-}
-
-export async function deleteDocument(collection: string, filter: Record<string, unknown>) {
-  return callMongoDB('deleteOne', { collection, filter });
+  if (error) throw error;
+  return { success: true };
 }

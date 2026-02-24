@@ -111,7 +111,7 @@ serve(async (req) => {
 
   try {
     const startYear = 2019;
-    const endYear = 2024;
+    const endYear = 2025;
 
     console.log(`Generating Pakistan national NDVI data for ${startYear}-${endYear}`);
 

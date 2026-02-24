@@ -8,3 +8,27 @@ verify_jwt = false
 
 [functions.get-ndvi-pakistan-range]
 verify_jwt = false
+
+[functions.get-aerosol-index]
+verify_jwt = false
+
+[functions.get-so2]
+verify_jwt = false
+
+[functions.get-no2]
+verify_jwt = false
+
+[functions.get-co]
+verify_jwt = false
+
+[functions.get-aerosol-pakistan-range]
+verify_jwt = false
+
+[functions.get-so2-pakistan-range]
+verify_jwt = false
+
+[functions.get-no2-pakistan-range]
+verify_jwt = false
+
+[functions.get-co-pakistan-range]
+verify_jwt = false

@@ -226,7 +226,7 @@ serve(async (req) => {
   }
 
   try {
-    const { lat, lon, startYear = 2019, endYear = 2024 } = await req.json();
+    const { lat, lon, startYear = 2019, endYear = 2025 } = await req.json();
 
     // Validate inputs
     if (typeof lat !== 'number' || typeof lon !== 'number') {
