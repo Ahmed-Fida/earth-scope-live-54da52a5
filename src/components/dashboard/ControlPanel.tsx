@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { format, subDays } from 'date-fns';
+import { format } from 'date-fns';
 import {
   ChevronRight,
   ChevronLeft,
@@ -9,6 +9,7 @@ import {
   Loader2,
   Save,
   AlertTriangle,
+  Search,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -27,10 +28,10 @@ import { cn } from '@/lib/utils';
 import {
   PARAMETERS,
   ParameterType,
-  generateTimeSeries,
-  calculateStats,
-  generateInsights,
+  getAnalysisTitle,
+  getAnalysisSubtitle,
 } from '@/lib/mockData';
+import { PAKISTAN_DISTRICTS, PakistanDistrict } from '@/lib/pakistanDistricts';
 import { DrawnShape } from './LeafletMap';
 import { AnalysisResults } from './AnalysisResults';
 import { PakistanNDVIWidget } from './PakistanNDVIWidget';
@@ -45,7 +46,6 @@ const parameterList = Object.entries(PARAMETERS).map(([id, config]) => ({
   color: config.palette[Math.floor(config.palette.length / 2)],
 }));
 
-// Pakistan bounding box
 const PAKISTAN_BOUNDS = {
   minLat: 23.5,
   maxLat: 37.1,
@@ -73,20 +73,25 @@ export function ControlPanel({ isOpen, onToggle, drawnShape }: ControlPanelProps
   const { addAnalysis } = useAnalysisHistory();
   const [selectedParameter, setSelectedParameter] = useState<ParameterType>('NDVI');
   const [startDate, setStartDate] = useState<Date>(new Date('2019-01-01'));
-  const [endDate, setEndDate] = useState<Date>(new Date('2024-12-31'));
+  const [endDate, setEndDate] = useState<Date>(new Date('2025-12-31'));
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<any>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
   
-  // Coordinate input mode
-  const [inputMode, setInputMode] = useState<'draw' | 'coordinates' | 'bbox'>('coordinates');
-  const [coordLat, setCoordLat] = useState('30.3753'); // Default to Lahore
+  // Coordinate input mode — removed 'bbox'
+  const [inputMode, setInputMode] = useState<'draw' | 'coordinates' | 'district'>('coordinates');
+  const [coordLat, setCoordLat] = useState('30.3753');
   const [coordLng, setCoordLng] = useState('69.3451');
-  const [bboxNorth, setBboxNorth] = useState('');
-  const [bboxSouth, setBboxSouth] = useState('');
-  const [bboxEast, setBboxEast] = useState('');
-  const [bboxWest, setBboxWest] = useState('');
+  
+  // District selector
+  const [selectedDistrict, setSelectedDistrict] = useState<PakistanDistrict | null>(null);
+  const [districtSearch, setDistrictSearch] = useState('');
+
+  const filteredDistricts = PAKISTAN_DISTRICTS.filter(d =>
+    d.name.toLowerCase().includes(districtSearch.toLowerCase()) ||
+    d.province.toLowerCase().includes(districtSearch.toLowerCase())
+  );
 
   // Validate coordinates when they change
   useEffect(() => {
@@ -100,24 +105,10 @@ export function ControlPanel({ isOpen, onToggle, drawnShape }: ControlPanelProps
           setValidationError(null);
         }
       }
-    } else if (inputMode === 'bbox' && bboxNorth && bboxSouth && bboxEast && bboxWest) {
-      const north = parseFloat(bboxNorth);
-      const south = parseFloat(bboxSouth);
-      const east = parseFloat(bboxEast);
-      const west = parseFloat(bboxWest);
-      if (!isNaN(north) && !isNaN(south) && !isNaN(east) && !isNaN(west)) {
-        const centerLat = (north + south) / 2;
-        const centerLon = (east + west) / 2;
-        if (!isInsidePakistan(centerLat, centerLon)) {
-          setValidationError('Bounding box center is outside Pakistan.');
-        } else {
-          setValidationError(null);
-        }
-      }
     } else {
       setValidationError(null);
     }
-  }, [inputMode, coordLat, coordLng, bboxNorth, bboxSouth, bboxEast, bboxWest]);
+  }, [inputMode, coordLat, coordLng]);
 
   const handleAnalyze = async () => {
     let hasValidArea = false;
@@ -130,7 +121,6 @@ export function ControlPanel({ isOpen, onToggle, drawnShape }: ControlPanelProps
       hasValidArea = true;
       geometry = drawnShape.geoJSON?.geometry;
       geometryType = drawnShape.type;
-      // Get center point from drawn shape
       if (drawnShape.geoJSON?.geometry) {
         const coords = drawnShape.geoJSON.geometry as any;
         if (coords.type === 'Point') {
@@ -151,51 +141,28 @@ export function ControlPanel({ isOpen, onToggle, drawnShape }: ControlPanelProps
         geometryType = 'point';
         (window as any).leafletMapMethods?.addMarker(lat, lon);
       }
-    } else if (inputMode === 'bbox' && bboxNorth && bboxSouth && bboxEast && bboxWest) {
-      const north = parseFloat(bboxNorth);
-      const south = parseFloat(bboxSouth);
-      const east = parseFloat(bboxEast);
-      const west = parseFloat(bboxWest);
-      
-      if (!isNaN(north) && !isNaN(south) && !isNaN(east) && !isNaN(west)) {
-        hasValidArea = true;
-        lat = (north + south) / 2;
-        lon = (east + west) / 2;
-        geometry = {
-          type: 'Polygon',
-          coordinates: [[
-            [west, north],
-            [east, north],
-            [east, south],
-            [west, south],
-            [west, north],
-          ]],
-        };
-        geometryType = 'rectangle';
-        const coords = [
-          { lat: north, lng: west },
-          { lat: north, lng: east },
-          { lat: south, lng: east },
-          { lat: south, lng: west },
-        ];
-        (window as any).leafletMapMethods?.addShapeFromCoords(coords, 'rectangle');
-      }
+    } else if (inputMode === 'district' && selectedDistrict) {
+      lat = selectedDistrict.lat;
+      lon = selectedDistrict.lon;
+      hasValidArea = true;
+      geometry = { type: 'Point', coordinates: [lon, lat] };
+      geometryType = 'district';
+      (window as any).leafletMapMethods?.addMarker(lat, lon);
     }
 
     if (!hasValidArea || lat === null || lon === null) {
       toast({
         title: 'No area selected',
-        description: 'Please draw a shape on the map or enter coordinates.',
+        description: 'Please draw a shape, enter coordinates, or select a district.',
         variant: 'destructive',
       });
       return;
     }
 
-    // Validate Pakistan bounds
     if (!isInsidePakistan(lat, lon)) {
       toast({
         title: 'Location outside Pakistan',
-        description: 'This service only provides NDVI data for locations within Pakistan.',
+        description: 'This service only provides data for locations within Pakistan.',
         variant: 'destructive',
       });
       return;
@@ -204,91 +171,52 @@ export function ControlPanel({ isOpen, onToggle, drawnShape }: ControlPanelProps
     setIsAnalyzing(true);
 
     try {
-      // Use real NDVI endpoint for NDVI parameter
-      if (selectedParameter === 'NDVI') {
-        const startYear = startDate.getFullYear();
-        const endYear = endDate.getFullYear();
+      const startYear = startDate.getFullYear();
+      const endYear = endDate.getFullYear();
+      const paramConfig = PARAMETERS[selectedParameter];
 
-        const { data, error } = await supabase.functions.invoke('get-ndvi', {
-          body: { lat, lon, startYear, endYear },
-        });
+      const { data, error } = await supabase.functions.invoke(paramConfig.endpoint, {
+        body: { lat, lon, startYear, endYear },
+      });
 
-        if (error) {
-          throw new Error(error.message || 'Failed to fetch NDVI data');
-        }
-
-        if (data.error) {
-          throw new Error(data.error);
-        }
-
-        const paramConfig = PARAMETERS[selectedParameter];
-        const result = {
-          parameter: {
-            id: selectedParameter,
-            name: paramConfig.name,
-            fullName: paramConfig.name,
-            unit: paramConfig.unit,
-            color: paramConfig.palette[Math.floor(paramConfig.palette.length / 2)],
-          },
-          timeSeries: data.timeSeries,
-          stats: {
-            mean: data.stats.mean,
-            min: data.stats.min,
-            max: data.stats.max,
-            stdDev: data.stats.stdDev,
-            trend: data.stats.trendPercent,
-          },
-          insights: data.insights,
-          startDate: format(startDate, 'MMM d, yyyy'),
-          endDate: format(endDate, 'MMM d, yyyy'),
-          geometry,
-          geometryType,
-          source: data.source,
-        };
-
-        setAnalysisResult(result);
-        toast({
-          title: 'Analysis complete',
-          description: `Real NDVI data retrieved from ${data.source}.`,
-        });
-      } else {
-        // Use mock data for other parameters
-        await new Promise(resolve => setTimeout(resolve, 1500));
-
-        const timeSeries = generateTimeSeries(selectedParameter, startDate, endDate);
-        const stats = calculateStats(timeSeries);
-        const insights = generateInsights(selectedParameter, stats);
-        const paramConfig = PARAMETERS[selectedParameter];
-
-        const result = {
-          parameter: {
-            id: selectedParameter,
-            name: paramConfig.name,
-            fullName: paramConfig.name,
-            unit: paramConfig.unit,
-            color: paramConfig.palette[Math.floor(paramConfig.palette.length / 2)],
-          },
-          timeSeries,
-          stats: {
-            mean: stats.mean,
-            min: stats.min,
-            max: stats.max,
-            stdDev: stats.stdDev,
-            trend: stats.trendPercent,
-          },
-          insights,
-          startDate: format(startDate, 'MMM d, yyyy'),
-          endDate: format(endDate, 'MMM d, yyyy'),
-          geometry,
-          geometryType,
-        };
-
-        setAnalysisResult(result);
-        toast({
-          title: 'Analysis complete',
-          description: `${paramConfig.name} data retrieved successfully.`,
-        });
+      if (error) {
+        throw new Error(error.message || `Failed to fetch ${selectedParameter} data`);
       }
+
+      if (data.error) {
+        throw new Error(data.error);
+      }
+
+      const result = {
+        parameter: {
+          id: selectedParameter,
+          name: paramConfig.name,
+          fullName: paramConfig.name,
+          unit: paramConfig.unit,
+          color: paramConfig.palette[Math.floor(paramConfig.palette.length / 2)],
+        },
+        timeSeries: data.timeSeries,
+        stats: {
+          mean: data.stats.mean,
+          min: data.stats.min,
+          max: data.stats.max,
+          stdDev: data.stats.stdDev || 0,
+          trend: data.stats.trendPercent || 0,
+        },
+        insights: data.insights,
+        startDate: format(startDate, 'MMM d, yyyy'),
+        endDate: format(endDate, 'MMM d, yyyy'),
+        geometry,
+        geometryType,
+        source: data.source,
+        satellite: data.satellite || paramConfig.satellite,
+      };
+
+      setAnalysisResult(result);
+      toast({
+        title: 'Analysis complete',
+        description: `${paramConfig.name} data retrieved from ${data.source || paramConfig.satellite}.`,
+      });
     } catch (error) {
       console.error('Analysis error:', error);
       toast({
@@ -366,6 +294,11 @@ export function ControlPanel({ isOpen, onToggle, drawnShape }: ControlPanelProps
     URL.revokeObjectURL(url);
   };
 
+  const panelTitle = getAnalysisTitle(selectedParameter);
+  const panelSubtitle = analysisResult
+    ? getAnalysisSubtitle(analysisResult.satellite, startDate.getFullYear(), endDate.getFullYear())
+    : getAnalysisSubtitle(PARAMETERS[selectedParameter].satellite, startDate.getFullYear(), endDate.getFullYear());
+
   return (
     <>
       <button
@@ -388,13 +321,13 @@ export function ControlPanel({ isOpen, onToggle, drawnShape }: ControlPanelProps
             className="fixed right-0 top-0 h-screen w-[400px] bg-card border-l border-border shadow-2xl z-20 overflow-hidden flex flex-col"
           >
             <div className="p-4 border-b border-border">
-              <h2 className="text-lg font-semibold">Pakistan NDVI Analysis</h2>
-              <p className="text-sm text-muted-foreground">MODIS satellite data (2019-2024)</p>
+              <h2 className="text-lg font-semibold">{panelTitle}</h2>
+              <p className="text-sm text-muted-foreground">{panelSubtitle}</p>
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 space-y-6">
-              {/* Pakistan-wide NDVI Widget */}
-              <PakistanNDVIWidget />
+              {/* Pakistan-wide Widget */}
+              <PakistanNDVIWidget selectedParameter={selectedParameter} />
 
               {/* Parameter Selection */}
               <div className="space-y-2">
@@ -410,29 +343,21 @@ export function ControlPanel({ isOpen, onToggle, drawnShape }: ControlPanelProps
                           <div className="w-3 h-3 rounded-full" style={{ backgroundColor: param.color }} />
                           <span>{param.id}</span>
                           <span className="text-muted-foreground text-xs">({param.unit})</span>
-                          {param.id === 'NDVI' && (
-                            <span className="text-xs text-primary font-medium">Real Data</span>
-                          )}
                         </div>
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-                {selectedParameter !== 'NDVI' && (
-                  <p className="text-xs text-muted-foreground">
-                    Note: Only NDVI uses real satellite data. Other parameters use simulated data.
-                  </p>
-                )}
               </div>
 
-              {/* Area Input Mode */}
+              {/* Area Input Mode — removed bbox */}
               <div className="space-y-3">
                 <Label>Area Selection Method</Label>
                 <Tabs value={inputMode} onValueChange={(v) => setInputMode(v as any)}>
                   <TabsList className="grid w-full grid-cols-3">
                     <TabsTrigger value="draw">Draw</TabsTrigger>
                     <TabsTrigger value="coordinates">Point</TabsTrigger>
-                    <TabsTrigger value="bbox">Bbox</TabsTrigger>
+                    <TabsTrigger value="district">District</TabsTrigger>
                   </TabsList>
 
                   <TabsContent value="draw" className="mt-3">
@@ -477,13 +402,47 @@ export function ControlPanel({ isOpen, onToggle, drawnShape }: ControlPanelProps
                     </p>
                   </TabsContent>
 
-                  <TabsContent value="bbox" className="mt-3 space-y-3">
-                    <div className="grid grid-cols-2 gap-3">
-                      <div><Label className="text-xs">North (Max Lat)</Label><Input type="number" step="any" placeholder="e.g., 35" value={bboxNorth} onChange={(e) => setBboxNorth(e.target.value)} /></div>
-                      <div><Label className="text-xs">South (Min Lat)</Label><Input type="number" step="any" placeholder="e.g., 25" value={bboxSouth} onChange={(e) => setBboxSouth(e.target.value)} /></div>
-                      <div><Label className="text-xs">East (Max Lon)</Label><Input type="number" step="any" placeholder="e.g., 75" value={bboxEast} onChange={(e) => setBboxEast(e.target.value)} /></div>
-                      <div><Label className="text-xs">West (Min Lon)</Label><Input type="number" step="any" placeholder="e.g., 65" value={bboxWest} onChange={(e) => setBboxWest(e.target.value)} /></div>
+                  <TabsContent value="district" className="mt-3 space-y-3">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Search districts..."
+                        value={districtSearch}
+                        onChange={(e) => setDistrictSearch(e.target.value)}
+                        className="pl-9"
+                      />
                     </div>
+                    <div className="max-h-48 overflow-y-auto space-y-1 border border-border rounded-lg p-1">
+                      {filteredDistricts.slice(0, 50).map((district) => (
+                        <button
+                          key={`${district.name}-${district.province}`}
+                          onClick={() => {
+                            setSelectedDistrict(district);
+                            setDistrictSearch('');
+                            (window as any).leafletMapMethods?.addMarker(district.lat, district.lon);
+                          }}
+                          className={cn(
+                            'w-full text-left px-3 py-2 rounded text-sm hover:bg-muted/50 transition-colors',
+                            selectedDistrict?.name === district.name && selectedDistrict?.province === district.province
+                              ? 'bg-primary/10 text-primary font-medium'
+                              : ''
+                          )}
+                        >
+                          <span>{district.name}</span>
+                          <span className="text-xs text-muted-foreground ml-2">({district.province})</span>
+                        </button>
+                      ))}
+                      {filteredDistricts.length === 0 && (
+                        <p className="text-sm text-muted-foreground text-center py-4">No districts found</p>
+                      )}
+                    </div>
+                    {selectedDistrict && (
+                      <div className="flex items-center gap-2 p-2 bg-primary/10 rounded-lg text-sm">
+                        <MapPin className="w-4 h-4 text-primary" />
+                        <span className="font-medium">{selectedDistrict.name}</span>
+                        <span className="text-xs text-muted-foreground">({selectedDistrict.province})</span>
+                      </div>
+                    )}
                   </TabsContent>
                 </Tabs>
                 
@@ -498,7 +457,7 @@ export function ControlPanel({ isOpen, onToggle, drawnShape }: ControlPanelProps
 
               {/* Date Range */}
               <div className="space-y-3">
-                <Label>Date Range (2019-2024)</Label>
+                <Label>Date Range (2019-2025)</Label>
                 <div className="grid grid-cols-2 gap-3">
                   <Popover>
                     <PopoverTrigger asChild>
@@ -515,7 +474,7 @@ export function ControlPanel({ isOpen, onToggle, drawnShape }: ControlPanelProps
                         initialFocus 
                         className="pointer-events-auto"
                         fromDate={new Date('2019-01-01')}
-                        toDate={new Date('2024-12-31')}
+                        toDate={new Date('2025-12-31')}
                       />
                     </PopoverContent>
                   </Popover>
@@ -534,7 +493,7 @@ export function ControlPanel({ isOpen, onToggle, drawnShape }: ControlPanelProps
                         initialFocus 
                         className="pointer-events-auto"
                         fromDate={new Date('2019-01-01')}
-                        toDate={new Date('2024-12-31')}
+                        toDate={new Date('2025-12-31')}
                       />
                     </PopoverContent>
                   </Popover>

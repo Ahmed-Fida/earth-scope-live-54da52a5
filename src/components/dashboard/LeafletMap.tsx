@@ -22,22 +22,49 @@ interface LeafletMapProps {
   onShapeDrawn?: (shape: DrawnShape | null) => void;
 }
 
+// Pakistan bounding box for validation
+const PAKISTAN_BOUNDS_OBJ = { minLat: 23.5, maxLat: 37.1, minLon: 60.9, maxLon: 77.5 };
+
+function isPointInsidePakistan(lat: number, lon: number): boolean {
+  return (
+    lat >= PAKISTAN_BOUNDS_OBJ.minLat &&
+    lat <= PAKISTAN_BOUNDS_OBJ.maxLat &&
+    lon >= PAKISTAN_BOUNDS_OBJ.minLon &&
+    lon <= PAKISTAN_BOUNDS_OBJ.maxLon
+  );
+}
+
+function isShapeInsidePakistan(layer: any, layerType: string): boolean {
+  if (layerType === 'marker') {
+    const latlng = layer.getLatLng();
+    return isPointInsidePakistan(latlng.lat, latlng.lng);
+  }
+  // For polygons/rectangles, check all vertices
+  const latlngs = layer.getLatLngs()[0] || layer.getLatLngs();
+  for (const latlng of latlngs) {
+    if (!isPointInsidePakistan(latlng.lat, latlng.lng)) {
+      return false;
+    }
+  }
+  return true;
+}
+
 export function LeafletMap({ onShapeDrawn }: LeafletMapProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const drawnItemsRef = useRef<L.FeatureGroup | null>(null);
+  const toastRef = useRef<((msg: string) => void) | null>(null);
 
   useEffect(() => {
     if (!mapContainer.current || mapRef.current) return;
 
-    // Pakistan boundaries
     const pakistanBounds = L.latLngBounds(
-      L.latLng(23.5, 60.9),  // Southwest corner
-      L.latLng(37.1, 77.5)   // Northeast corner
+      L.latLng(23.5, 60.9),
+      L.latLng(37.1, 77.5)
     );
 
     const map = L.map(mapContainer.current, {
-      center: [30.3753, 69.3451], // Center of Pakistan
+      center: [30.3753, 69.3451],
       zoom: 5,
       zoomControl: false,
       maxBounds: pakistanBounds,
@@ -51,7 +78,6 @@ export function LeafletMap({ onShapeDrawn }: LeafletMapProps) {
       attribution: '&copy; OpenStreetMap contributors',
     }).addTo(map);
 
-    // Fit to Pakistan bounds initially
     map.fitBounds(pakistanBounds, { padding: [20, 20] });
 
     const drawnItems = new L.FeatureGroup();
@@ -78,8 +104,27 @@ export function LeafletMap({ onShapeDrawn }: LeafletMapProps) {
     });
     map.addControl(drawControl);
 
+    // Show toast for outside-Pakistan drawing
+    const showToast = (msg: string) => {
+      // Create a temporary notification on the map
+      const notification = L.DomUtil.create('div', '');
+      notification.style.cssText = 'position:fixed;top:80px;left:50%;transform:translateX(-50%);z-index:9999;background:hsl(0 84% 60%);color:white;padding:12px 24px;border-radius:8px;font-size:14px;box-shadow:0 4px 12px rgba(0,0,0,0.3);';
+      notification.textContent = msg;
+      document.body.appendChild(notification);
+      setTimeout(() => {
+        if (notification.parentNode) notification.parentNode.removeChild(notification);
+      }, 3000);
+    };
+
     map.on(L.Draw.Event.CREATED, (e: any) => {
       const layer = e.layer;
+
+      // Check if shape is inside Pakistan
+      if (!isShapeInsidePakistan(layer, e.layerType)) {
+        showToast('Please select a location within Pakistan');
+        return; // Don't add the shape
+      }
+
       drawnItems.clearLayers();
       drawnItems.addLayer(layer);
 
@@ -101,7 +146,6 @@ export function LeafletMap({ onShapeDrawn }: LeafletMapProps) {
 
     mapRef.current = map;
 
-    // Expose methods globally
     (window as any).leafletMapMethods = {
       addMarker: (lat: number, lng: number) => {
         drawnItems.clearLayers();
