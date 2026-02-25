@@ -32,10 +32,12 @@ serve(async (req) => {
     }
     const values = timeSeries.map(p => Number(p.value));
     const mean = values.reduce((a, b) => a + b, 0) / values.length;
+    const variance = values.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / values.length;
+    const stdDev = Math.sqrt(variance);
 
     return new Response(JSON.stringify({
       success: true, country: 'Pakistan', dateRange: { startYear, endYear }, nationalTimeSeries: timeSeries,
-      stats: { mean: Number(mean.toExponential(4)), min: Number(Math.min(...values).toExponential(4)), max: Number(Math.max(...values).toExponential(4)), peakMonth: 'December-January (Winter)', lowMonth: 'July-August (Monsoon)' },
+      stats: { mean: Number(mean.toExponential(4)), min: Number(Math.min(...values).toExponential(4)), max: Number(Math.max(...values).toExponential(4)), stdDev: Number(stdDev.toExponential(4)), peakMonth: 'December-January (Winter)', lowMonth: 'July-August (Monsoon)' },
       insights: ['NO₂ is primarily from vehicular emissions and power generation.', 'COVID-19 lockdowns in 2020 caused ~25% reduction.', 'Winter inversions trap NO₂ near the surface.'],
       source: 'Sentinel-5P TROPOMI NO₂ Column',
       satellite: 'Sentinel-5P',

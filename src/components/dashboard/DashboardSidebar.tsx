@@ -22,7 +22,6 @@ import { useAuth } from '@/hooks/useAuth';
 
 const menuItems = [
   { icon: LayoutDashboard, label: 'Dashboard', href: '/dashboard' },
-  { icon: Map, label: 'My Areas', href: '/dashboard/areas' },
   { icon: History, label: 'History', href: '/dashboard/history' },
   { icon: HelpCircle, label: 'Support', href: '/dashboard/support' },
   { icon: Info, label: 'About', href: '/dashboard/about' },

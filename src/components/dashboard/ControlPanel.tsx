@@ -71,7 +71,7 @@ interface ControlPanelProps {
 export function ControlPanel({ isOpen, onToggle, drawnShape }: ControlPanelProps) {
   const { toast } = useToast();
   const { addAnalysis } = useAnalysisHistory();
-  const [selectedParameter, setSelectedParameter] = useState<ParameterType>('NDVI');
+  const [selectedParameter, setSelectedParameter] = useState<ParameterType | ''>('');
   const [startDate, setStartDate] = useState<Date>(new Date('2019-01-01'));
   const [endDate, setEndDate] = useState<Date>(new Date('2025-12-31'));
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -111,6 +111,15 @@ export function ControlPanel({ isOpen, onToggle, drawnShape }: ControlPanelProps
   }, [inputMode, coordLat, coordLng]);
 
   const handleAnalyze = async () => {
+    if (!selectedParameter) {
+      toast({
+        title: 'No indicator selected',
+        description: 'Please select an environmental parameter first.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     let hasValidArea = false;
     let geometry: unknown = null;
     let geometryType = '';
@@ -294,10 +303,10 @@ export function ControlPanel({ isOpen, onToggle, drawnShape }: ControlPanelProps
     URL.revokeObjectURL(url);
   };
 
-  const panelTitle = getAnalysisTitle(selectedParameter);
+  const panelTitle = selectedParameter ? getAnalysisTitle(selectedParameter as ParameterType) : 'Pakistan Environmental Analysis';
   const panelSubtitle = analysisResult
     ? getAnalysisSubtitle(analysisResult.satellite, startDate.getFullYear(), endDate.getFullYear())
-    : getAnalysisSubtitle(PARAMETERS[selectedParameter].satellite, startDate.getFullYear(), endDate.getFullYear());
+    : selectedParameter ? getAnalysisSubtitle(PARAMETERS[selectedParameter as ParameterType].satellite, startDate.getFullYear(), endDate.getFullYear()) : 'Select an indicator to begin';
 
   return (
     <>
@@ -327,14 +336,14 @@ export function ControlPanel({ isOpen, onToggle, drawnShape }: ControlPanelProps
 
             <div className="flex-1 overflow-y-auto p-4 space-y-6">
               {/* Pakistan-wide Widget */}
-              <PakistanNDVIWidget selectedParameter={selectedParameter} />
+              {selectedParameter && <PakistanNDVIWidget selectedParameter={selectedParameter as ParameterType} />}
 
               {/* Parameter Selection */}
               <div className="space-y-2">
                 <Label>Environmental Parameter</Label>
                 <Select value={selectedParameter} onValueChange={(v) => setSelectedParameter(v as ParameterType)}>
                   <SelectTrigger>
-                    <SelectValue />
+                    <SelectValue placeholder="Select indicator..." />
                   </SelectTrigger>
                   <SelectContent className="bg-popover">
                     {parameterList.map(param => (

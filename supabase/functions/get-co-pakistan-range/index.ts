@@ -30,10 +30,12 @@ serve(async (req) => {
     }
     const values = timeSeries.map(p => p.value);
     const mean = values.reduce((a, b) => a + b, 0) / values.length;
+    const variance = values.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / values.length;
+    const stdDev = Math.sqrt(variance);
 
     return new Response(JSON.stringify({
       success: true, country: 'Pakistan', dateRange: { startYear, endYear }, nationalTimeSeries: timeSeries,
-      stats: { mean: Number(mean.toFixed(4)), min: Number(Math.min(...values).toFixed(4)), max: Number(Math.max(...values).toFixed(4)), peakMonth: 'November-December (Winter/Crop Burning)', lowMonth: 'July-August (Monsoon)' },
+      stats: { mean: Number(mean.toFixed(4)), min: Number(Math.min(...values).toFixed(4)), max: Number(Math.max(...values).toFixed(4)), stdDev: Number(stdDev.toFixed(4)), peakMonth: 'November-December (Winter/Crop Burning)', lowMonth: 'July-August (Monsoon)' },
       insights: ['CO peaks during winter and post-harvest crop burning.', 'Vehicular emissions and brick kilns are major contributors.', 'Monsoon rainfall helps reduce atmospheric CO.'],
       source: 'Sentinel-5P TROPOMI CO Total Column',
       satellite: 'Sentinel-5P',
