@@ -26,6 +26,7 @@ function generateSO2(lat: number, lon: number, startYear: number, endYear: numbe
     for (let month = 1; month <= 12; month++) {
       const date = `${year}-${month.toString().padStart(2, '0')}-01`;
       const monthRad = ((month - 1) / 12) * 2 * Math.PI;
+      // SO₂: Higher in winter (Dec-Jan), lower in summer (Jun-Jul)
       const seasonal = 0.08 * Math.sin(monthRad + Math.PI);
       const seed = locationSeed + year * 13 + month * 7;
       const variation = (seededRandom(seed) - 0.5) * 0.06;
@@ -51,10 +52,17 @@ serve(async (req) => {
     const timeSeries = generateSO2(lat, lon, startYear, endYear);
     const values = timeSeries.map(p => p.value);
     const mean = values.reduce((a, b) => a + b, 0) / values.length;
+    const variance = values.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / values.length;
+    const stdDev = Math.sqrt(variance);
+    const n = values.length, xMean = (n - 1) / 2;
+    let num = 0, den = 0;
+    for (let i = 0; i < n; i++) { num += (i - xMean) * (values[i] - mean); den += (i - xMean) ** 2; }
+    const slope = den !== 0 ? num / den : 0;
+    const trendPct = mean !== 0 ? ((slope * n) / mean) * 100 : 0;
 
     return new Response(JSON.stringify({
       success: true, location: { lat, lon }, dateRange: { startYear, endYear }, timeSeries,
-      stats: { mean: Number(mean.toFixed(4)), min: Number(Math.min(...values).toFixed(4)), max: Number(Math.max(...values).toFixed(4)) },
+      stats: { mean: Number(mean.toFixed(4)), min: Number(Math.min(...values).toFixed(4)), max: Number(Math.max(...values).toFixed(4)), stdDev: Number(stdDev.toFixed(4)), trend: Math.abs(trendPct) < 2 ? 'stable' : trendPct > 0 ? 'increasing' : 'decreasing', trendPercent: Number(trendPct.toFixed(1)) },
       insights: [
         mean > 0.3 ? 'Elevated SO₂ levels — industrial emissions or power plants nearby.' : 'SO₂ within normal background levels.',
         'SO₂ peaks during winter due to increased fossil fuel combustion.',

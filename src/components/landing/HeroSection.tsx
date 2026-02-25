@@ -55,7 +55,7 @@ export function HeroSection() {
           </motion.h1>
 
           <motion.p initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="text-lg md:text-xl text-muted-foreground max-w-3xl mx-auto mb-10">
-            Monitor vegetation health, air quality, soil moisture, rainfall, temperature, evapotranspiration and more — anywhere on Earth using satellite data.
+            Monitor vegetation health, air quality, and atmospheric pollutants across Pakistan using satellite data.
           </motion.p>
 
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16">
@@ -64,9 +64,9 @@ export function HeroSection() {
           </motion.div>
 
           <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }} className="grid grid-cols-2 md:grid-cols-4 gap-8 md:gap-12 p-6 rounded-2xl glass-card max-w-3xl mx-auto">
-            <AnimatedStat value={11} suffix="+" label="Parameters" />
-            <AnimatedStat value={100} suffix="M+" label="km² Analyzed" />
-            <AnimatedStat value={15} suffix="+" label="Data Sources" />
+            <AnimatedStat value={5} suffix="" label="Parameters" />
+            <AnimatedStat value={881913} suffix="" label="km² Analyzed" />
+            <AnimatedStat value={3} suffix="+" label="Data Sources" />
             <AnimatedStat value={99.9} suffix="%" label="Uptime" />
           </motion.div>
         </div>

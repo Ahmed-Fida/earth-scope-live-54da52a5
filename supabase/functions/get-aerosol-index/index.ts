@@ -53,6 +53,8 @@ serve(async (req) => {
     const timeSeries = generateAerosolIndex(lat, lon, startYear, endYear);
     const values = timeSeries.map(p => p.value);
     const mean = values.reduce((a, b) => a + b, 0) / values.length;
+    const variance = values.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / values.length;
+    const stdDev = Math.sqrt(variance);
     const n = values.length, xMean = (n - 1) / 2;
     let num = 0, den = 0;
     for (let i = 0; i < n; i++) { num += (i - xMean) * (values[i] - mean); den += (i - xMean) ** 2; }
@@ -61,7 +63,7 @@ serve(async (req) => {
 
     return new Response(JSON.stringify({
       success: true, location: { lat, lon }, dateRange: { startYear, endYear }, timeSeries,
-      stats: { mean: Number(mean.toFixed(4)), min: Number(Math.min(...values).toFixed(4)), max: Number(Math.max(...values).toFixed(4)), trend: Math.abs(trendPct) < 2 ? 'stable' : trendPct > 0 ? 'increasing' : 'decreasing', trendPercent: Number(trendPct.toFixed(1)) },
+      stats: { mean: Number(mean.toFixed(4)), min: Number(Math.min(...values).toFixed(4)), max: Number(Math.max(...values).toFixed(4)), stdDev: Number(stdDev.toFixed(4)), trend: Math.abs(trendPct) < 2 ? 'stable' : trendPct > 0 ? 'increasing' : 'decreasing', trendPercent: Number(trendPct.toFixed(1)) },
       insights: [
         mean > 2 ? 'High aerosol loading — dust or industrial pollution.' : mean > 1 ? 'Moderate aerosol levels — typical for semi-arid regions.' : 'Low aerosol index — clean atmospheric conditions.',
         'Aerosol peaks during May-June dust season and post-harvest crop burning (Oct-Nov).',

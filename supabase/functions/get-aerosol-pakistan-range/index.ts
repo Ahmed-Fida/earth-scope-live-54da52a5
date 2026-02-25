@@ -30,10 +30,12 @@ serve(async (req) => {
     }
     const values = timeSeries.map(p => p.value);
     const mean = values.reduce((a, b) => a + b, 0) / values.length;
+    const variance = values.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / values.length;
+    const stdDev = Math.sqrt(variance);
 
     return new Response(JSON.stringify({
       success: true, country: 'Pakistan', dateRange: { startYear, endYear }, nationalTimeSeries: timeSeries,
-      stats: { mean: Number(mean.toFixed(4)), min: Number(Math.min(...values).toFixed(4)), max: Number(Math.max(...values).toFixed(4)), peakMonth: 'May-June (Dust Season)', lowMonth: 'January-February' },
+      stats: { mean: Number(mean.toFixed(4)), min: Number(Math.min(...values).toFixed(4)), max: Number(Math.max(...values).toFixed(4)), stdDev: Number(stdDev.toFixed(4)), peakMonth: 'May-June (Dust Season)', lowMonth: 'January-February' },
       insights: ['Aerosol index peaks during May-June dust storms.', 'Post-harvest crop burning causes secondary spike.', 'Winter months show lowest aerosol levels.'],
       source: 'Sentinel-5P TROPOMI Absorbing Aerosol Index',
       satellite: 'Sentinel-5P',

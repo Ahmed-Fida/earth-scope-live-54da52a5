@@ -95,10 +95,8 @@ export function LeafletMap({ onShapeDrawn }: LeafletMapProps) {
           showArea: true,
           shapeOptions: { color: '#22c55e', fillColor: '#22c55e', fillOpacity: 0.2, weight: 2 },
         },
-        rectangle: {
-          shapeOptions: { color: '#22c55e', fillColor: '#22c55e', fillOpacity: 0.2, weight: 2 },
-        },
-        marker: {},
+        rectangle: false,
+        marker: false,
       },
       edit: { featureGroup: drawnItems, remove: true },
     });
@@ -109,7 +107,7 @@ export function LeafletMap({ onShapeDrawn }: LeafletMapProps) {
       // Create a temporary notification on the map
       const notification = L.DomUtil.create('div', '');
       notification.style.cssText = 'position:fixed;top:80px;left:50%;transform:translateX(-50%);z-index:9999;background:hsl(0 84% 60%);color:white;padding:12px 24px;border-radius:8px;font-size:14px;box-shadow:0 4px 12px rgba(0,0,0,0.3);';
-      notification.textContent = msg;
+      notification.textContent = 'Please choose within the boundaries of Pakistan.';
       document.body.appendChild(notification);
       setTimeout(() => {
         if (notification.parentNode) notification.parentNode.removeChild(notification);
